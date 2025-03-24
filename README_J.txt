@@ -8,3 +8,4 @@ python3 setup.py install
 
 //설치 확인
 python3 -c "import spidev; print(spidev)" 
+//
