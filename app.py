@@ -35,7 +35,9 @@ danger_active = False  # 위험 상태를 추적하는 변수
 heart_rate = 0  # 심박수 변수 초기화
 latitude = 0
 longitude = 0  # GPS 데이터 변수 초기화
-"""
+
+
+
 def read_acceleration_data():
     global sensor, connection_lost, x_acceleration, y_acceleration, z_acceleration, z_delta
     global x_acceleration_prev, y_acceleration_prev, z_acceleration_prev
@@ -56,9 +58,13 @@ def read_acceleration_data():
         x_delta = x_acceleration - x_acceleration_prev
         y_delta = y_acceleration - y_acceleration_prev
         z_delta = abs(z_acceleration - z_acceleration_prev)
-
+        print("x 가속도: %d" % x_acceleration)
+        print("y 가속도: %d" % y_acceleration)
+        print("z 가속도: %d" % z_acceleration)
+        
         momentary_acceleration = round((x_delta**2 + y_delta**2 + z_delta**2)**0.5, 3)
-
+        print("순간 가속도: %d" % momentary_acceleration)
+        
         # 이전 가속도 값을 현재 값으로 업데이트
         x_acceleration_prev = x_acceleration
         y_acceleration_prev = y_acceleration
@@ -84,7 +90,9 @@ def read_acceleration_data():
         x_acceleration = y_acceleration = z_acceleration = 0.0
         momentary_acceleration = 0.0
         danger_active = False  # 위험 상태 비활성화
-"""
+
+
+
 def get_heart_rate():
     global heart_rate
 
@@ -111,6 +119,7 @@ def get_gps_data():
         while True:
             # GPS 데이터 읽기
             report = session.next()
+            print(report)
 
             # GPS 데이터 유형이 'TPV'인지 확인
             if report['class'] == 'TPV':
@@ -122,6 +131,7 @@ def get_gps_data():
                     latitude=latitude
                     longitude=longitude
 
+            print(report)
             time.sleep(1)  # 데이터를 1초에 한 번씩 출력합니다.
     
     except KeyError:
@@ -146,17 +156,17 @@ def index():
 
 @app.route('/data')
 def get_data():
-    ##read_acceleration_data()
+    read_acceleration_data()
     data = {
-        ###'x_acceleration': x_acceleration,
-        ###'y_acceleration': y_acceleration,
-        ##'z_acceleration': z_acceleration,
-        ##'z_delta': z_delta,
-        ##'momentary_acceleration': momentary_acceleration,
+        'x_acceleration': x_acceleration,
+        'y_acceleration': y_acceleration,
+        'z_acceleration': z_acceleration,
+        'z_delta': z_delta,
+        'momentary_acceleration': momentary_acceleration,
         'danger_active': danger_active,  # 위험 상태 정보 추가
         'heart_rate': heart_rate,  # 심박수 정보 추가
-        'latitude': latitude,  # GPS 위도 정보 추가
-        'longitude': longitude  # GPS 경도 정보 추가
+        'latitude': latitude if latitude != 0.0 else None,
+        'longitude': longitude if longitude != 0.0 else None
     }
     return jsonify(data)
 
