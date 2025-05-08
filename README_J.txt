@@ -37,7 +37,7 @@ unzip master.zip
 cd py-spidev-master
 python3 setup.py install
 
-//설치 확인
+//설치 확인 /
 python3 -c "import spidev; print(spidev)" 
 
 //github에 새 파일 추가 & 업데이트
