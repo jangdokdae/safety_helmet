@@ -115,6 +115,22 @@
             width: 100%;
             height: 200px;
         }
+
+        .log-button {
+            padding: 12px 25px;
+            font-size: 20px;
+            background-color: #1F8C4D;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            margin: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .log-button:hover {
+            background-color: #155d35;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB3sp8Y66Lu0pU83Xtw7_FXcvcXcUpI0wY"></script>
@@ -149,6 +165,9 @@
     </div>
     <div id="button-container">
         <button id="stopButton" onclick="stopBlink()">구조대 출발</button>
+        <br>
+        <a href="/danger_logs"><button class="log-button">📌 위험 로그 보기</button></a>
+        <a href="/summary_logs"><button class="log-button">📊 요약 로그 보기</button></a>
     </div>
 
     <script>

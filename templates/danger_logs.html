@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Danger Logs</title>
+</head>
+
+<body>
+    <h2>📌 최근 위험 로그</h2>
+    <table border="1">
+        <tr>
+            <th>시간</th>
+            <th>X</th>
+            <th>Y</th>
+            <th>Z</th>
+            <th>순간 가속도</th>
+            <th>심박수</th>
+            <th>위험 여부</th>
+        </tr>
+        {% for row in logs %}
+        <tr>
+            <td>{{ row[0] }}</td>
+            <td>{{ row[1] }}</td>
+            <td>{{ row[2] }}</td>
+            <td>{{ row[3] }}</td>
+            <td>{{ row[4] }}</td>
+            <td>{{ row[5] }}</td>
+            <td>{{ '위험' if row[6] else '정상' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/summary_logs">📊 요약 데이터 보기</a>
+</body>
+
+</html>

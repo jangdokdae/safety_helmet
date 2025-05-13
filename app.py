@@ -5,7 +5,6 @@ from flask import Flask, jsonify, render_template
 import gps
 import threading
 from pulsesensor import Pulsesensor
-import time
 import mysql.connector
 
 # Flask 애플리케이션 생성
@@ -37,14 +36,16 @@ heart_rate = 0  # 심박수 변수 초기화
 latitude = 0
 longitude = 0  # GPS 데이터 변수 초기화
 
+db_config = {
+    'host': '192.168.137.202',
+    'user': 'pi',
+    'password': 'raspberrypi',
+    'database': 'sensor_data'
+}
+
 def save_to_database():
     try:
-        conn = mysql.connector.connect(
-            host='192.168.137.202',   # 또는 localhost
-            user='pi',               # 사용자 계정
-            password='raspberrypi',
-            database='sensor_data'
-        )
+        conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         query = """
         INSERT INTO acceleration_logs 
@@ -77,12 +78,7 @@ def save_summary_to_database():
         avg_heart = heart_rate
         sample_count = len(acceleration_history)
 
-        conn = mysql.connector.connect(
-            host='192.168.137.202',
-            user='pi',
-            password='raspberrypi',
-            database='sensor_data'
-        )
+        conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         query = """
         INSERT INTO summary_logs 
@@ -247,6 +243,32 @@ def reset_danger():
     danger_active = False
     GPIO.output(led_on, GPIO.LOW)
     return jsonify({'status': 'reset'})
+        
+@app.route('/danger_logs')
+def show_danger_logs():
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT timestamp, x_accel, y_accel, z_accel, momentary_accel, heart_rate, danger_active 
+        FROM danger_logs ORDER BY timestamp DESC LIMIT 50
+    """)
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template('danger_logs.html', logs=rows)
+
+@app.route('/summary_logs')
+def show_summary_logs():
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT timestamp, danger_active, avg_accel, max_accel, avg_heart_rate, sample_count
+        FROM summary_logs ORDER BY timestamp DESC LIMIT 50
+    """)
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template('summary_logs.html', logs=rows)
 
 if __name__ == '__main__':
     try:
