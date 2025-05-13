@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>관리자  </title>
+    <title>관리자 </title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR&display=swap" rel="stylesheet">
     <style>
         body {
@@ -21,7 +22,7 @@
             justify-content: center;
             height: 100vh;
             transition: background-color 0.5s;
-        }        
+        }
 
         h1 {
             margin: 10px 0 20px;
@@ -118,6 +119,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB3sp8Y66Lu0pU83Xtw7_FXcvcXcUpI0wY"></script>
 </head>
+
 <body>
     <h1>담당자 : 남효정 </h1>
     <div class="sensor-container">
@@ -158,12 +160,10 @@
 
         const loadTime = Date.now();
 
-        setTimeout(function() 
-        {
+        setTimeout(function () {
             const currentTime = Date.now();
-            if (currentTime - loadTime <= 3000) 
-            {
-                danger_active = false; 
+            if (currentTime - loadTime <= 3000) {
+                danger_active = false;
             }
         }, 3000);
 
@@ -214,16 +214,14 @@
                         document.getElementById('danger-container').style.visibility = 'visible';
                         createDangerContainer();
                         alertActive = true;
-                    } 
-                    else
-                    {
+                    }
+                    else {
                         alertActive = false;
                     }
 
                     updateMap(data.latitude, data.longitude);
 
-                    if (acc_chart) 
-                    {
+                    if (acc_chart) {
                         acc_chart.data.labels.push('');
                         acc_chart.data.datasets[0].data.push(momentaryAcceleration);
                         if (acc_chart.data.labels.length > 10) {
@@ -232,8 +230,7 @@
                         }
                         acc_chart.update();
                     }
-                    if(heart_chart)
-                    {
+                    if (heart_chart) {
                         heart_chart.data.labels.push('');
                         heart_chart.data.datasets[0].data.push(heartrate);
                         if (heart_chart.data.labels.length > 10) {
@@ -265,7 +262,7 @@
                         x: {
                             display: false
                         },
-                        y: {    
+                        y: {
                             beginAtZero: true,
                             max: 30
                         }
@@ -294,7 +291,7 @@
                         x: {
                             display: false
                         },
-                        y: {    
+                        y: {
                             beginAtZero: true,
                             max: 200
                         }
@@ -324,16 +321,17 @@
             map.setCenter(newPosition);
         }
 
-        document.getElementById('stopButton').addEventListener('click', function() {
+        document.getElementById('stopButton').addEventListener('click', function () {
             alert('구조대가 출발했습니다.');
             stopAlert();
         });
 
-        window.onload = function() {
+        window.onload = function () {
             createChart();
             initMap();
             setInterval(fetchData, 1000);
         };
     </script>
 </body>
+
 </html>

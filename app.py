@@ -6,12 +6,13 @@ import gps
 import threading
 from pulsesensor import Pulsesensor
 import time
+import mysql.connector
 
 # Flask 애플리케이션 생성
 app = Flask(__name__)
 
 # MPU6050 가속도 센서 객체 생성
-###sensor = mpu6050(0x68)
+sensor = mpu6050(0x68)
 
 # GPIO 핀 번호 설정
 led_on = 26
@@ -36,6 +37,37 @@ heart_rate = 0  # 심박수 변수 초기화
 latitude = 0
 longitude = 0  # GPS 데이터 변수 초기화
 
+def save_to_database():
+    try:
+        conn = mysql.connector.connect(
+            host='192.168.137.202',   # 또는 localhost
+            user='pi',               # 사용자 계정
+            password='rapsberrypi',
+            database='sensor_data'
+        )
+        cursor = conn.cursor()
+        query = """
+        INSERT INTO acceleration_logs 
+        (x_accel, y_accel, z_accel, z_delta, momentary_accel, heart_rate, danger_active, latitude, longitude)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (
+            x_acceleration,
+            y_acceleration,
+            z_acceleration,
+            z_delta,
+            momentary_acceleration,
+            heart_rate,
+            danger_active,
+            latitude if latitude != 0.0 else None,
+            longitude if longitude != 0.0 else None
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✅ 데이터 저장 완료")
+    except Exception as e:
+        print(f"❌ 데이터 저장 실패: {e}")
 
 
 def read_acceleration_data():
@@ -110,36 +142,28 @@ def get_heart_rate():
         p.stopAsyncBPM()
 
 
-
 def get_gps_data():
     global latitude, longitude
     session = gps.gps(mode=gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
 
     try:
         while True:
-            # GPS 데이터 읽기
             report = session.next()
-            print(report)
+            print(report)  # 전체 report 출력
 
-            # GPS 데이터 유형이 'TPV'인지 확인
-            if report['class'] == 'TPV':
-                latitude = getattr(report, 'lat', 0.0)
-                longitude = getattr(report, 'lon', 0.0)
+            if getattr(report, 'class', None) == 'TPV':
+                lat = getattr(report, 'lat', 0.0)
+                lon = getattr(report, 'lon', 0.0)
 
-                if latitude != 0.0 and longitude != 0.0:
+                if lat != 0.0 and lon != 0.0:
+                    latitude = lat
+                    longitude = lon
                     print(f"Latitude: {latitude}, Longitude: {longitude}")
-                    latitude=latitude
-                    longitude=longitude
 
-            print(report)
-            time.sleep(1)  # 데이터를 1초에 한 번씩 출력합니다.
-    
-    except KeyError:
-        pass
-    except KeyboardInterrupt:
-        print("Exiting...")
-    except StopIteration:
-        print("GPSD has terminated")
+            time.sleep(1)
+    except Exception as e:
+        print(f"Error in GPS loop: {e}")
+
 
 # GPS 데이터 수집을 위한 스레드 시작
 gps_thread = threading.Thread(target=get_gps_data)
@@ -157,6 +181,10 @@ def index():
 @app.route('/data')
 def get_data():
     read_acceleration_data()
+    
+    if danger_active:
+        save_to_database()
+    
     data = {
         'x_acceleration': x_acceleration,
         'y_acceleration': y_acceleration,
