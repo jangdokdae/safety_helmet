@@ -42,7 +42,7 @@ def save_to_database():
         conn = mysql.connector.connect(
             host='192.168.137.202',   # 또는 localhost
             user='pi',               # 사용자 계정
-            password='rapsberrypi',
+            password='raspberrypi',
             database='sensor_data'
         )
         cursor = conn.cursor()
@@ -68,6 +68,40 @@ def save_to_database():
         print("✅ 데이터 저장 완료")
     except Exception as e:
         print(f"❌ 데이터 저장 실패: {e}")
+
+
+def save_summary_to_database():
+    try:
+        avg_accel = round(sum(acceleration_history) / len(acceleration_history), 3)
+        max_accel = max(acceleration_history)
+        avg_heart = heart_rate
+        sample_count = len(acceleration_history)
+
+        conn = mysql.connector.connect(
+            host='192.168.137.202',
+            user='pi',
+            password='raspberrypi',
+            database='sensor_data'
+        )
+        cursor = conn.cursor()
+        query = """
+        INSERT INTO summary_logs 
+        (danger_active, avg_accel, max_accel, avg_heart_rate, sample_count)
+        VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (
+            danger_active,
+            avg_accel,
+            max_accel,
+            avg_heart,
+            sample_count
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("📊 요약 데이터 저장 완료")
+    except Exception as e:
+        print(f"❌ 요약 데이터 저장 실패: {e}")
 
 
 def read_acceleration_data():
@@ -164,8 +198,16 @@ def get_gps_data():
     except Exception as e:
         print(f"Error in GPS loop: {e}")
 
+def save_summary_periodically():
+    while True:
+        if len(acceleration_history) >= 10:
+            save_summary_to_database()
+        time.sleep(10)
 
-# GPS 데이터 수집을 위한 스레드 시작
+summary_thread = threading.Thread(target=save_summary_periodically)
+summary_thread.daemon = True
+summary_thread.start()
+
 gps_thread = threading.Thread(target=get_gps_data)
 gps_thread.daemon = True
 gps_thread.start()
