@@ -3,32 +3,53 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Summary Logs</title>
+    <title>요약 로그 조회</title>
 </head>
 
 <body>
-    <h2>📊 최근 요약 로그</h2>
+    <h1>요약 로그 조회</h1>
+
+    <form method="get" action="/summary_logs_by_date">
+        <label for="date">날짜 선택:</label>
+        <input type="date" id="date" name="date" value="{{ selected_date or '' }}">
+        <button type="submit">조회</button>
+    </form>
+
+    {% if selected_date %}
+    <p><strong>{{ selected_date }}의 로그 결과</strong></p>
+    {% endif %}
+
     <table border="1">
-        <tr>
-            <th>시간</th>
-            <th>위험 여부</th>
-            <th>평균 가속도</th>
-            <th>최대 가속도</th>
-            <th>평균 심박수</th>
-            <th>샘플 수</th>
-        </tr>
-        {% for row in logs %}
-        <tr>
-            <td>{{ row[1] }}</td> <!-- timestamp -->
-            <td>{{ '위험' if row[2] else '정상' }}</td> <!-- danger_active -->
-            <td>{{ row[3] }}</td> <!-- avg_accel -->
-            <td>{{ row[4] }}</td> <!-- max_accel -->
-            <td>{{ row[5] }}</td> <!-- avg_heart_rate -->
-            <td>{{ row[6] }}</td> <!-- sample_count -->
-        </tr>
-        {% endfor %}
+        <thead>
+            <tr>
+                <th>시간</th>
+                <th>위험 여부</th>
+                <th>평균 가속도</th>
+                <th>최대 가속도</th>
+                <th>평균 심박수</th>
+                <th>가속도 샘플 개수</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in logs %}
+            <tr>
+                <td>{{ row[0] }}</td>
+                <td>{{ '위험' if row[1] else '정상' }}</td>
+                <td>{{ row[2] }}</td>
+                <td>{{ row[3] }}</td>
+                <td>{{ row[4] }}</td>
+                <td>{{ row[5] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
-    <a href="/danger_logs">📌 위험 데이터 보기</a>
+
+    <div style="margin-top: 30px;">
+        <a href="/" style="text-decoration: none;">
+            <button style="padding: 10px 20px; font-size: 16px;">🏠 관리자 페이지로 이동</button>
+        </a>
+    </div>
+
 </body>
 
 </html>
