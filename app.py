@@ -1,7 +1,7 @@
 from mpu6050 import mpu6050
 import RPi.GPIO as GPIO
 import time
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 import gps
 import threading
 from pulsesensor import Pulsesensor
@@ -48,7 +48,7 @@ def save_to_database():
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         query = """
-        INSERT INTO acceleration_logs 
+        INSERT INTO danger_logs 
         (x_accel, y_accel, z_accel, z_delta, momentary_accel, heart_rate, danger_active, latitude, longitude)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
@@ -243,32 +243,48 @@ def reset_danger():
     danger_active = False
     GPIO.output(led_on, GPIO.LOW)
     return jsonify({'status': 'reset'})
-        
-@app.route('/danger_logs')
-def show_danger_logs():
+
+@app.route('/danger_logs_by_date')
+def danger_logs_by_date():
+    date = request.args.get('date')  # YYYY-MM-DD 형식
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT timestamp, x_accel, y_accel, z_accel, momentary_accel, heart_rate, danger_active 
-        FROM danger_logs ORDER BY timestamp DESC LIMIT 50
-    """)
+        FROM danger_logs
+        WHERE DATE(timestamp) = %s
+        ORDER BY timestamp DESC
+        LIMIT 50
+    """, (date,))
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return render_template('danger_logs.html', logs=rows)
+    return render_template('danger_logs.html', logs=rows, selected_date=date)
 
-@app.route('/summary_logs')
-def show_summary_logs():
+@app.route('/summary_logs_by_date')
+def summary_logs_by_date():
+    date = request.args.get('date')
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT timestamp, danger_active, avg_accel, max_accel, avg_heart_rate, sample_count
-        FROM summary_logs ORDER BY timestamp DESC LIMIT 50
-    """)
+        FROM summary_logs
+        WHERE DATE(timestamp) = %s
+        ORDER BY timestamp DESC
+        LIMIT 50
+    """, (date,))
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return render_template('summary_logs.html', logs=rows)
+    return render_template('summary_logs.html', logs=rows, selected_date=date)
+
+@app.route('/summary_logs')
+def summary_logs_page():
+    return render_template('summary_logs.html', logs=[], selected_date=None)
+
+@app.route('/danger_logs')
+def danger_logs_page():
+    return render_template('danger_logs.html', logs=[], selected_date=None)
 
 if __name__ == '__main__':
     try:
