@@ -214,6 +214,8 @@
             alertActive = false;
         }
 
+        let previousDangerActive = false;
+
         function fetchData() {
             fetch('/data')
                 .then(response => response.json())
@@ -233,9 +235,14 @@
                         document.getElementById('danger-container').style.visibility = 'visible';
                         createDangerContainer();
                         alertActive = true;
+                        previousDangerActive = true
                     }
                     else {
-                        alertActive = false;
+                        stopAlert();
+                        if (previousDangerActive === true) {
+                            alert('구조대가 출발했습니다.');
+                            previousDangerActive = false
+                        }
                     }
 
                     updateMap(data.latitude, data.longitude);
