@@ -12,7 +12,7 @@ import json
 app = Flask(__name__)
 
 # MQTT 설정
-mqtt_broker = "localhost"  # MQTT 브로커 IP
+mqtt_broker = "172.20.10.5"  # MQTT 브로커 IP
 mqtt_port = 1883
 mqtt_topic = "iot/sensor/data"
 
@@ -48,7 +48,7 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(mqtt_topic)
 
 def on_message(client, userdata, msg):
-    global sensor_data_mqtt, danger_active
+    global sensor_data_mqtt
     try:
         payload = msg.payload.decode()
         data = json.loads(payload)
@@ -62,7 +62,6 @@ def on_message(client, userdata, msg):
             elif command == 'led_off':
                 GPIO.output(led_pin, GPIO.LOW)
                 print("LED OFF (MQTT 수신)")
-                danger_active = False
             else:
                 print(f"알 수 없는 명령: {command}")
     except Exception as e:
@@ -181,10 +180,7 @@ def index():
 
 @app.route('/data')
 def get_data():
-    # 항상 최신 danger_active 포함해서 리턴
-    response = sensor_data_mqtt.copy()
-    response["danger_active"] = danger_active
-    return jsonify(response)
+    return jsonify(sensor_data_mqtt)
 
 @app.route('/reset')
 def reset_danger():
@@ -213,8 +209,4 @@ if __name__ == '__main__':
     finally:
         GPIO.cleanup()
         mqtt_client.loop_stop()
-<<<<<<< HEAD
         mqtt_client.disconnect()
-=======
-        mqtt_client.disconnect()
->>>>>>> 715fb2a4268b037ccb2f51c8e8f5e1aabe2979cc

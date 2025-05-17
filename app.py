@@ -1,7 +1,7 @@
 from mpu6050 import mpu6050
 import RPi.GPIO as GPIO
 import time
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 import gps
 import threading
 from pulsesensor import Pulsesensor
@@ -13,7 +13,6 @@ app = Flask(__name__)
 # MPU6050 가속도 센서 객체 생성
 sensor = mpu6050(0x68)
 
-# GPIO 핀 번호 설정
 led_on = 26
 # GPIO 핀 모드 설정
 GPIO.setmode(GPIO.BCM)
@@ -30,11 +29,11 @@ y_acceleration_prev = 0.0
 z_acceleration_prev = 0.0
 momentary_acceleration = 0.0
 acceleration_history = []
-z_delta = 0.0  # z_delta 변수 초기화
-danger_active = False  # 위험 상태를 추적하는 변수
-heart_rate = 0  # 심박수 변수 초기화
+z_delta = 0.0  
+danger_active = False  
+heart_rate = 0
 latitude = 0
-longitude = 0  # GPS 데이터 변수 초기화
+longitude = 0 
 
 db_config = {
     'host': '192.168.137.202',
@@ -43,12 +42,12 @@ db_config = {
     'database': 'sensor_data'
 }
 
-def save_to_database():
+def save_danger_to_database():
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         query = """
-        INSERT INTO acceleration_logs 
+        INSERT INTO danger_logs 
         (x_accel, y_accel, z_accel, z_delta, momentary_accel, heart_rate, danger_active, latitude, longitude)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
@@ -140,18 +139,17 @@ def read_acceleration_data():
         if (momentary_acceleration >= 9 and z_delta >= 9):
             GPIO.output(led_on, GPIO.HIGH)
             print("LED 켜짐")
-            danger_active = True  # 위험 상태 활성화
+            danger_active = True 
         elif(danger_active == False):
             GPIO.output(led_on, GPIO.LOW)
             print("LED 꺼짐")
 
     except Exception as e:
         print(f"Error reading acceleration data: {e}")
-        # 연결이 끊겼거나 오류가 발생한 경우에는 다시 연결 시도
         connection_lost = True
         x_acceleration = y_acceleration = z_acceleration = 0.0
         momentary_acceleration = 0.0
-        danger_active = False  # 위험 상태 비활성화
+        danger_active = False
 
 
 
@@ -179,7 +177,7 @@ def get_gps_data():
     try:
         while True:
             report = session.next()
-            print(report)  # 전체 report 출력
+            print(report)
 
             if getattr(report, 'class', None) == 'TPV':
                 lat = getattr(report, 'lat', 0.0)
@@ -193,6 +191,17 @@ def get_gps_data():
             time.sleep(1)
     except Exception as e:
         print(f"Error in GPS loop: {e}")
+
+def save_danger_periodically():
+    while True:
+        read_acceleration_data()
+        if danger_active:
+            save_danger_to_database()
+        time.sleep(1)  # 1초 간격
+
+danger_thread = threading.Thread(target=save_danger_periodically)
+danger_thread.daemon = True
+danger_thread.start()
 
 def save_summary_periodically():
     while True:
@@ -221,7 +230,7 @@ def get_data():
     read_acceleration_data()
     
     if danger_active:
-        save_to_database()
+        save_danger_to_database()
     
     data = {
         'x_acceleration': x_acceleration,
@@ -229,8 +238,8 @@ def get_data():
         'z_acceleration': z_acceleration,
         'z_delta': z_delta,
         'momentary_acceleration': momentary_acceleration,
-        'danger_active': danger_active,  # 위험 상태 정보 추가
-        'heart_rate': heart_rate,  # 심박수 정보 추가
+        'danger_active': danger_active,
+        'heart_rate': heart_rate,
         'latitude': latitude if latitude != 0.0 else None,
         'longitude': longitude if longitude != 0.0 else None
     }
@@ -243,32 +252,48 @@ def reset_danger():
     danger_active = False
     GPIO.output(led_on, GPIO.LOW)
     return jsonify({'status': 'reset'})
-        
-@app.route('/danger_logs')
-def show_danger_logs():
+
+@app.route('/danger_logs_by_date')
+def danger_logs_by_date():
+    date = request.args.get('date')  # YYYY-MM-DD 형식
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT timestamp, x_accel, y_accel, z_accel, momentary_accel, heart_rate, danger_active 
-        FROM danger_logs ORDER BY timestamp DESC LIMIT 50
-    """)
+        FROM danger_logs
+        WHERE DATE(timestamp) = %s
+        ORDER BY timestamp DESC
+        LIMIT 50
+    """, (date,))
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return render_template('danger_logs.html', logs=rows)
+    return render_template('danger_logs.html', logs=rows, selected_date=date)
 
-@app.route('/summary_logs')
-def show_summary_logs():
+@app.route('/summary_logs_by_date')
+def summary_logs_by_date():
+    date = request.args.get('date')
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT timestamp, danger_active, avg_accel, max_accel, avg_heart_rate, sample_count
-        FROM summary_logs ORDER BY timestamp DESC LIMIT 50
-    """)
+        FROM summary_logs
+        WHERE DATE(timestamp) = %s
+        ORDER BY timestamp DESC
+        LIMIT 50
+    """, (date,))
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return render_template('summary_logs.html', logs=rows)
+    return render_template('summary_logs.html', logs=rows, selected_date=date)
+
+@app.route('/summary_logs')
+def summary_logs_page():
+    return render_template('summary_logs.html', logs=[], selected_date=None)
+
+@app.route('/danger_logs')
+def danger_logs_page():
+    return render_template('danger_logs.html', logs=[], selected_date=None)
 
 if __name__ == '__main__':
     try:
