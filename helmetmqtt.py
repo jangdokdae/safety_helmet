@@ -1,12 +1,13 @@
 from mpu6050 import mpu6050
 import RPi.GPIO as GPIO
 import time
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 import gps
 import threading
 from pulsesensor import Pulsesensor
 import paho.mqtt.client as mqtt
 import json
+import mysql.connector
 
 # Flask 웹 서버 생성
 app = Flask(__name__)
@@ -75,6 +76,69 @@ mqtt_client.on_message = on_message
 mqtt_client.connect(mqtt_broker, mqtt_port, 60)
 mqtt_client.loop_start()
 
+db_config = {
+    'host': '192.168.137.202',
+    'user': 'pi',
+    'password': 'raspberrypi',
+    'database': 'sensor_data'
+}
+
+def save_danger_to_database():
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        query = """
+        INSERT INTO danger_logs 
+        (x_accel, y_accel, z_accel, z_delta, momentary_accel, heart_rate, danger_active, latitude, longitude)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (
+            x_acceleration,
+            y_acceleration,
+            z_acceleration,
+            z_delta,
+            momentary_acceleration,
+            heart_rate,
+            danger_active,
+            latitude if latitude != 0.0 else None,
+            longitude if longitude != 0.0 else None
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✅ 데이터 저장 완료")
+    except Exception as e:
+        print(f"❌ 데이터 저장 실패: {e}")
+
+def save_summary_to_database():
+    try:
+        date = request.args.get('date')
+        avg_accel = round(sum(acceleration_history) / len(acceleration_history), 3)
+        max_accel = max(acceleration_history)
+        avg_heart = heart_rate
+        sample_count = len(acceleration_history)
+
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        query = """
+        INSERT INTO summary_logs 
+        (danger_active, avg_accel, max_accel, avg_heart_rate, sample_count)
+        VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (
+            danger_active,
+            avg_accel,
+            max_accel,
+            avg_heart,
+            sample_count
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("📊 요약 데이터 저장 완료")
+    except Exception as e:
+        print(f"❌ 요약 데이터 저장 실패: {e}")
+
 # 가속도 데이터 읽기 함수
 def read_acceleration_data():
     global sensor, connection_lost
@@ -92,6 +156,7 @@ def read_acceleration_data():
         y_acceleration = round(data['y'], 3)
         z_acceleration = round(data['z'], 3)
 
+        # 순간 가속도 계산
         x_delta = x_acceleration - x_acceleration_prev
         y_delta = y_acceleration - y_acceleration_prev
         z_delta = abs(z_acceleration - z_acceleration_prev)
@@ -114,7 +179,7 @@ def read_acceleration_data():
         elif not danger_active:
             GPIO.output(led_pin, GPIO.LOW)
             mqtt_client.publish(mqtt_topic, json.dumps({'command': 'led_off'}))
-
+             
         # 센서 데이터 전송
         payload = json.dumps({
             'x_acceleration': x_acceleration,
@@ -159,8 +224,10 @@ def get_gps_data():
         while True:
             report = session.next()
             if report['class'] == 'TPV':
+                print("📡 GPS Report:", report)
                 latitude = getattr(report, 'lat', 0.0)
                 longitude = getattr(report, 'lon', 0.0)
+                print(f"🌍 위도: {latitude}, 경도: {longitude}")
             time.sleep(1)
     except Exception as e:
         print("GPS 오류:", e)
@@ -181,40 +248,81 @@ def index():
 
 @app.route('/data')
 def get_data():
-    # 항상 최신 danger_active 포함해서 리턴
-    response = sensor_data_mqtt.copy()
-    response["danger_active"] = danger_active
-    return jsonify(response)
+    read_acceleration_data()
+    save_summary_to_database()
+    
+    if danger_active:
+        save_danger_to_database()
+    
+    data = {
+        'x_acceleration': x_acceleration,
+        'y_acceleration': y_acceleration,
+        'z_acceleration': z_acceleration,
+        'z_delta': z_delta,
+        'momentary_acceleration': momentary_acceleration,
+        'danger_active': danger_active,
+        'heart_rate': heart_rate,
+        'latitude': latitude if latitude != 0.0 else None,
+        'longitude': longitude if longitude != 0.0 else None
+    }
+    return jsonify(data)
+
 
 @app.route('/reset')
 def reset_danger():
     global danger_active
     danger_active = False
     GPIO.output(led_pin, GPIO.LOW)
-    mqtt_client.publish(mqtt_topic, json.dumps({'command': 'led_off'}))
     return jsonify({'status': 'reset'})
 
-# 메인 실행부
+@app.route('/danger_logs_by_date')
+def danger_logs_by_date():
+    date = request.args.get('date')  # YYYY-MM-DD 형식
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT timestamp, x_accel, y_accel, z_accel, momentary_accel, heart_rate, danger_active 
+        FROM danger_logs
+        WHERE DATE(timestamp) = %s
+        ORDER BY timestamp DESC
+        LIMIT 50
+    """, (date,))
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return render_template('danger_logs.html', logs=rows, selected_date=date)
+
+@app.route('/summary_logs_by_date')
+def summary_logs_by_date():
+    date = request.args.get('date')
+    print("🗓️ 선택된 날짜:", date) 
+    conn = mysql.connector.connect(**db_config)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT timestamp, danger_active, avg_accel, max_accel, avg_heart_rate, sample_count
+        FROM summary_logs
+        WHERE DATE(timestamp) = %s
+        ORDER BY timestamp DESC
+        LIMIT 50
+    """, (date,))
+    rows = cursor.fetchall()
+    print("📦 가져온 row 수:", len(rows))
+    cursor.close()
+    conn.close()
+    return render_template('summary_logs.html', logs=rows, selected_date=date)
+
+@app.route('/summary_logs')
+def summary_logs_page():
+    return render_template('summary_logs.html', logs=[], selected_date=None)
+
+@app.route('/danger_logs')
+def danger_logs_page():
+    return render_template('danger_logs.html', logs=[], selected_date=None)
+
 if __name__ == '__main__':
     try:
-        def sensor_loop():
-            while True:
-                read_acceleration_data()
-                time.sleep(1)
-
-        sensor_thread = threading.Thread(target=sensor_loop)
-        sensor_thread.daemon = True
-        sensor_thread.start()
-
         app.run(host='0.0.0.0', port=8000)
-
     except KeyboardInterrupt:
         pass
     finally:
         GPIO.cleanup()
-        mqtt_client.loop_stop()
-<<<<<<< HEAD
-        mqtt_client.disconnect()
-=======
-        mqtt_client.disconnect()
->>>>>>> 715fb2a4268b037ccb2f51c8e8f5e1aabe2979cc
