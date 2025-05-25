@@ -190,7 +190,7 @@
             const dangerContainer = document.createElement('div');
             dangerContainer.id = 'danger-container';
             dangerContainer.classList.add('danger-container');
-            const textNode = document.createTextNode('위도 45, 경도 135에서 위험이 발생했습니다!');
+            const textNode = document.createTextNode('위도 37.3291165, 경도 127.1147474에서 위험이 발생했습니다!');
             dangerContainer.appendChild(textNode);
             document.body.appendChild(dangerContainer);
             dangerContainerCreated = true;
@@ -222,31 +222,34 @@
                 .then(data => {
                     const momentaryAcceleration = data.momentary_acceleration.toFixed(3);
                     const heartrate = data.heart_rate.toFixed(0);
+
                     document.getElementById('x-acceleration').innerText = data.x_acceleration.toFixed(3);
                     document.getElementById('y-acceleration').innerText = data.y_acceleration.toFixed(3);
                     document.getElementById('z-acceleration').innerText = data.z_acceleration.toFixed(3);
                     document.getElementById('z_delta').innerText = data.z_delta.toFixed(3);
                     document.getElementById('momentary-acceleration').innerText = momentaryAcceleration;
-                    document.getElementById('heart_rate').innerText = data.heart_rate.toFixed(0);
-                    document.getElementById('latitude').innerText = data.latitude;
-                    document.getElementById('longitude').innerText = data.longitude;
+                    document.getElementById('heart_rate').innerText = heartrate;
+
+                    const fixedLat = 37.3291165;
+                    const fixedLng = 127.1147474;
+                    document.getElementById('latitude').innerText = fixedLat;
+                    document.getElementById('longitude').innerText = fixedLng;
+                    updateMap(fixedLat, fixedLng);
 
                     if (data.danger_active) {
                         document.getElementById('danger-container').style.visibility = 'visible';
                         createDangerContainer();
                         alertActive = true;
-                        previousDangerActive = true
-                    }
-                    else {
+                        previousDangerActive = true;
+                    } else {
                         stopAlert();
                         if (previousDangerActive === true) {
                             alert('구조대가 출발했습니다.');
-                            previousDangerActive = false
+                            previousDangerActive = false;
                         }
                     }
 
-                    updateMap(data.latitude, data.longitude);
-
+                    // 차트 업데이트
                     if (acc_chart) {
                         acc_chart.data.labels.push('');
                         acc_chart.data.datasets[0].data.push(momentaryAcceleration);
@@ -256,6 +259,7 @@
                         }
                         acc_chart.update();
                     }
+
                     if (heart_chart) {
                         heart_chart.data.labels.push('');
                         heart_chart.data.datasets[0].data.push(heartrate);

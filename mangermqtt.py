@@ -10,7 +10,7 @@ GPIO.setup(LED_PIN, GPIO.OUT)
 # 버튼은 풀업(pull-up)으로, 누르면 GND에 연결되었다고 가정
 GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-mqtt_broker = "192.168.137.202"
+mqtt_broker = "192.168.137.98"
 mqtt_port = 1883
 mqtt_topic = "iot/sensor/data"
 
